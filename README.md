@@ -34,10 +34,11 @@ BoxOTP는 Google Authenticator·Authy 같은 인증 앱을 **브라우저 안에
 ## 설치
 
 ### 개발자 모드 로드
-1. Chrome 주소창에 `chrome://extensions` 입력
-2. 우측 상단 **개발자 모드** 토글 켜기
-3. **압축해제된 확장 프로그램 로드** 클릭
-4. 이 `BoxOTP-ChromeExtention` 폴더 선택
+1. Github 우측상단 Download ZIP으로 다운로드
+2. Chrome 주소창에 `chrome://extensions` 입력
+3. 우측 상단 **개발자 모드** 토글 켜기
+4. **압축해제된 확장 프로그램 로드** 클릭
+5. 이 `BoxOTP-ChromeExtention` 폴더 선택
 
 업데이트(코드 변경 후): 같은 페이지에서 BoxOTP 카드 우측 하단의 새로고침 아이콘 클릭.
 
