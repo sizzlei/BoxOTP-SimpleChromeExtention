@@ -57,6 +57,7 @@
   const closeRenameBtn   = $('closeRenameBtn');
   const tileMenu     = $('tileMenu');
   const captureScreenBtn = $('captureScreenBtn');
+  const qrScanBtn    = $('qrScanBtn');
   const toastEl      = $('toast');
   const pwModal      = $('pwModal');
   const pwTitle      = $('pwTitle');
@@ -1351,19 +1352,16 @@
       }
     });
 
-    // 화면 캡처 버튼
+    // 화면 캡처 (폼 내부 버튼 — 폼 에러 영역에 표시)
     captureScreenBtn.addEventListener('click', async () => {
-      try {
-        const resp = await chrome.runtime.sendMessage({ action: 'start-capture' });
-        if (!resp || !resp.ok) {
-          showError(formError, '캡처 시작 실패: ' + ((resp && resp.error) || '알 수 없는 오류'));
-          return;
-        }
-        // 팝업을 닫아 사용자가 페이지에서 드래그할 수 있게 함
-        window.close();
-      } catch (e) {
-        showError(formError, '오류: ' + e.message);
-      }
+      const err = await startScreenCapture();
+      if (err) showError(formError, err);
+    });
+
+    // 화면 캡처 (헤더 아이콘 — 토스트로 알림)
+    qrScanBtn.addEventListener('click', async () => {
+      const err = await startScreenCapture();
+      if (err) showToast(err, 'error');
     });
 
     // QR 파일 입력
@@ -1405,7 +1403,23 @@
     });
   }
 
-  // ----- 캡처 결과 자동 채움 -----
+  // ----- 화면 드래그 캡처 시작 (공통) -----
+  // 성공 시 팝업을 닫고 null 반환, 실패 시 에러 메시지 문자열 반환
+  async function startScreenCapture() {
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: 'start-capture' });
+      if (!resp || !resp.ok) {
+        return '캡처 시작 실패: ' + ((resp && resp.error) || '알 수 없는 오류');
+      }
+      // 팝업을 닫아 사용자가 페이지에서 드래그할 수 있게 함
+      window.close();
+      return null;
+    } catch (e) {
+      return '오류: ' + e.message;
+    }
+  }
+
+  // ----- 캡처 결과 → 즉시 저장 -----
   async function checkPendingCapture() {
     const PENDING_KEY = 'pending_capture';
     let uri = null;
@@ -1430,16 +1444,32 @@
         showToast('TOTP만 지원됩니다', 'error');
         return;
       }
-      // 폼 열고 직접입력 탭으로 + 미리 채움
-      openForm(null);
-      setTab('manual');
-      fLabel.value = p.label || '';
-      fIssuer.value = p.issuer || '';
-      fSecret.value = p.secret || '';
-      fDigits.value = String(p.digits || 6);
-      fPeriod.value = String(p.period || 30);
-      fAlgorithm.value = (p.algorithm || 'SHA1').toUpperCase();
-      showToast('QR 인식됨 — 확인 후 저장', 'success');
+      const secret = (p.secret || '').replace(/\s+/g, '').toUpperCase();
+      const v = BoxOTP.validateSecret(secret);
+      if (!v.ok) {
+        showToast('시크릿 키 오류: ' + v.error, 'error');
+        return;
+      }
+      // 중복 시크릿 확인 (이미 등록된 항목이면 스킵)
+      if (entries.some((e) => e.secret === secret)) {
+        showToast('이미 등록된 OTP입니다', 'error');
+        return;
+      }
+      const entry = {
+        id: uid(),
+        label: p.label || '',
+        issuer: p.issuer || '',
+        secret,
+        digits: p.digits || 6,
+        period: p.period || 30,
+        algorithm: (p.algorithm || 'SHA1').toUpperCase(),
+        createdAt: Date.now()
+      };
+      entries.push(entry);
+      await saveEntries();
+      render();
+      const name = entry.issuer ? `${entry.issuer} · ${entry.label}` : (entry.label || '(이름 없음)');
+      showToast(`${name} 추가됨`, 'success');
     } catch (e) {
       showToast('QR 파싱 실패: ' + e.message, 'error');
     }
