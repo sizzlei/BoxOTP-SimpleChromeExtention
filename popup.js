@@ -7,6 +7,9 @@
 
   const STORAGE_KEY = 'otp_entries';
   const VIEW_KEY = 'view_mode';     // 'tile' | 'detail'
+  const THEME_KEY = 'theme_mode';   // 'dark' | 'light' | 'sepia' | 'midnight'
+  const VALID_THEMES = ['dark', 'light', 'sepia', 'midnight'];
+  const DEFAULT_THEME = 'dark';
   const SCHEMA_VERSION = 1;
 
   // ----- DOM 핸들 -----
@@ -83,6 +86,7 @@
   let gauthPages = [];     // [{ uri, index, total, count }]
   let gauthCurrentPage = 0;
   let viewMode = 'tile';   // 'tile' | 'detail'
+  let theme = DEFAULT_THEME;
   let dragSourceId = null; // 드래그 중인 entry id
   let renameTargetId = null;
   let tileMenuTargetId = null;
@@ -112,6 +116,25 @@
   }
   async function saveViewMode() {
     await storageSet(VIEW_KEY, viewMode);
+  }
+
+  // ----- 테마 -----
+  async function loadTheme() {
+    const v = await storageGet(THEME_KEY);
+    theme = VALID_THEMES.includes(v) ? v : DEFAULT_THEME;
+  }
+  function applyTheme() {
+    document.documentElement.setAttribute('data-theme', theme);
+    // 메뉴의 활성 표시 갱신
+    document.querySelectorAll('.theme-item').forEach((el) => {
+      el.classList.toggle('active', el.dataset.action === 'theme-' + theme);
+    });
+  }
+  async function setTheme(name) {
+    if (!VALID_THEMES.includes(name)) return;
+    theme = name;
+    await storageSet(THEME_KEY, theme);
+    applyTheme();
   }
 
   // ----- 유틸 -----
@@ -1284,13 +1307,16 @@
     menuDropdown.querySelectorAll('.dropdown-item').forEach((item) => {
       item.addEventListener('click', () => {
         const act = item.dataset.action;
-        toggleMenu(false);
+        // 테마 변경은 메뉴를 닫지 않아 사용자가 여러 테마를 비교해볼 수 있음
+        const isTheme = act && act.startsWith('theme-');
+        if (!isTheme) toggleMenu(false);
         if (act === 'export-plain') exportPlain();
         if (act === 'export-encrypted') exportEncrypted();
         if (act === 'export-gauth') exportGoogleAuth();
         if (act === 'import') importFile.click();
         if (act === 'import-txt') importTxtFile.click();
         if (act === 'delete-all') confirmDeleteAll();
+        if (isTheme) setTheme(act.slice('theme-'.length));
       });
     });
 
@@ -1477,9 +1503,12 @@
 
   // ----- 초기화 -----
   async function init() {
+    await loadTheme();
+    applyTheme();           // FOUC 최소화를 위해 DOM/이벤트 바인딩 전에 한 번 적용
     await loadEntries();
     await loadViewMode();
     bindEvents();
+    applyTheme();           // 메뉴 .theme-item의 active 클래스 갱신을 위해 한 번 더
     render();
     startTimerLoop();
     await checkPendingCapture();

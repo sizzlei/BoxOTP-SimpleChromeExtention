@@ -1,4 +1,4 @@
-/* BoxOTP - 미니멀 다크모드 */
+/* BoxOTP - 멀티 테마 (다크 / 라이트 / 세피아 / 미드나잇) */
 
 * {
   box-sizing: border-box;
@@ -6,7 +6,9 @@
   padding: 0;
 }
 
-:root {
+/* ------- 기본 (다크) ------- */
+:root,
+:root[data-theme="dark"] {
   --bg: #0f1115;
   --bg-elev: #181b21;
   --bg-elev-2: #20242c;
@@ -17,12 +19,74 @@
   --text-dim: #6b7280;
   --accent: #5eead4;
   --accent-hover: #2dd4bf;
+  --accent-soft: rgba(94, 234, 212, 0.10);
   --danger: #f87171;
   --danger-hover: #ef4444;
   --warning: #fbbf24;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --modal-backdrop: rgba(0, 0, 0, 0.55);
   --radius: 10px;
   --radius-sm: 6px;
+}
+
+/* ------- 라이트 (화이트톤) ------- */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elev: #f7f8fa;
+  --bg-elev-2: #eef0f3;
+  --border: #e1e5eb;
+  --border-hi: #c9cfd8;
+  --text: #1a1d23;
+  --text-mute: #5b6470;
+  --text-dim: #9aa3b2;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-soft: rgba(13, 148, 136, 0.10);
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --warning: #d97706;
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --modal-backdrop: rgba(15, 23, 42, 0.40);
+}
+
+/* ------- 세피아 (따뜻한 종이톤) ------- */
+:root[data-theme="sepia"] {
+  --bg: #f6efe1;
+  --bg-elev: #efe6d3;
+  --bg-elev-2: #e6dcc4;
+  --border: #d4c8a8;
+  --border-hi: #b8a978;
+  --text: #3d2f1e;
+  --text-mute: #7a6a51;
+  --text-dim: #a89679;
+  --accent: #b85c38;
+  --accent-hover: #9a4828;
+  --accent-soft: rgba(184, 92, 56, 0.10);
+  --danger: #c0392b;
+  --danger-hover: #9c2c20;
+  --warning: #d97706;
+  --shadow: 0 8px 24px rgba(61, 47, 30, 0.18);
+  --modal-backdrop: rgba(61, 47, 30, 0.45);
+}
+
+/* ------- 미드나잇 (인디고 + 퍼플) ------- */
+:root[data-theme="midnight"] {
+  --bg: #0d0b1e;
+  --bg-elev: #16142b;
+  --bg-elev-2: #1e1b3a;
+  --border: #2d2a4a;
+  --border-hi: #3f3b5f;
+  --text: #e9e7f5;
+  --text-mute: #a09cba;
+  --text-dim: #6b6688;
+  --accent: #a78bfa;
+  --accent-hover: #8b5cf6;
+  --accent-soft: rgba(167, 139, 250, 0.12);
+  --danger: #fb7185;
+  --danger-hover: #f43f5e;
+  --warning: #fbbf24;
+  --shadow: 0 8px 24px rgba(8, 6, 28, 0.55);
+  --modal-backdrop: rgba(8, 6, 28, 0.65);
 }
 
 html, body {
@@ -155,6 +219,44 @@ body {
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+
+.dropdown-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 6px 10px 2px;
+  user-select: none;
+}
+
+/* 테마 선택 메뉴 아이템 */
+.theme-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.theme-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  flex-shrink: 0;
+}
+
+.theme-item.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.theme-item.active::after {
+  content: '✓';
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 /* ----- OTP List ----- */
@@ -329,7 +431,7 @@ body {
 
 .otp-tile.drag-over {
   border-color: var(--accent);
-  background: rgba(94, 234, 212, 0.08);
+  background: var(--accent-soft);
 }
 
 .tile-issuer {
@@ -501,7 +603,7 @@ body {
 .modal {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--modal-backdrop);
   display: flex;
   align-items: flex-end;
   z-index: 200;
@@ -717,7 +819,7 @@ body {
 
 .qr-drop.dragover .qr-drop-label {
   border-color: var(--accent);
-  background: rgba(94, 234, 212, 0.05);
+  background: var(--accent-soft);
 }
 
 .qr-preview {
