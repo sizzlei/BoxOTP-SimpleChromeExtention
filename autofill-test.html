@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>BoxOTP 자동 채우기 테스트</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+    h2 { margin-top: 30px; font-size: 16px; color: #333; }
+    .case { padding: 12px; background: #f8f8f8; border-radius: 8px; margin-bottom: 12px; }
+    .case p { margin: 0 0 8px; font-size: 13px; color: #666; }
+    input { font-size: 16px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .split input { width: 32px; text-align: center; margin-right: 4px; }
+    .out { margin-top: 6px; font-size: 12px; color: #888; }
+    .out span { color: #16a085; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>BoxOTP 자동 채우기 테스트 페이지</h1>
+  <p>각 입력란에 커서를 두지 않아도, BoxOTP 팝업에서 OTP를 클릭하면 아래 적절한 입력란이 자동으로 채워집니다.</p>
+
+  <div class="case">
+    <h2>1. autocomplete="one-time-code" (표준)</h2>
+    <input type="text" autocomplete="one-time-code" id="c1">
+    <div class="out">값: <span id="o1"></span></div>
+  </div>
+
+  <div class="case">
+    <h2>2. name="otp"</h2>
+    <input type="text" name="otp" id="c2">
+    <div class="out">값: <span id="o2"></span></div>
+  </div>
+
+  <div class="case">
+    <h2>3. inputmode="numeric" maxlength="6"</h2>
+    <input type="text" inputmode="numeric" maxlength="6" id="c3">
+    <div class="out">값: <span id="o3"></span></div>
+  </div>
+
+  <div class="case">
+    <h2>4. placeholder="인증번호"</h2>
+    <input type="text" placeholder="인증번호 6자리" id="c4">
+    <div class="out">값: <span id="o4"></span></div>
+  </div>
+
+  <div class="case">
+    <h2>5. 분할 입력 (6칸, maxlength=1)</h2>
+    <div class="split">
+      <input type="tel" maxlength="1" autocomplete="one-time-code">
+      <input type="tel" maxlength="1">
+      <input type="tel" maxlength="1">
+      <input type="tel" maxlength="1">
+      <input type="tel" maxlength="1">
+      <input type="tel" maxlength="1">
+    </div>
+  </div>
+
+  <div class="case">
+    <h2>6. id에 "2fa" 포함</h2>
+    <input type="text" id="login-2fa-code">
+    <div class="out">값: <span id="o6"></span></div>
+  </div>
+
+  <script>
+    // 각 입력의 input 이벤트를 받아 값 표시
+    document.querySelectorAll('input[id]').forEach((inp) => {
+      const out = document.getElementById('o' + inp.id.replace(/[^0-9]/g, '').slice(0, 1));
+      if (!out) return;
+      inp.addEventListener('input', () => { out.textContent = inp.value; });
+    });
+  </script>
+</body>
+</html>
