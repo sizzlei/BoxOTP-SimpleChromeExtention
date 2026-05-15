@@ -10,6 +10,14 @@
   const THEME_KEY = 'theme_mode';   // 'dark' | 'light' | 'sepia' | 'midnight'
   const VALID_THEMES = ['dark', 'light', 'sepia', 'midnight'];
   const DEFAULT_THEME = 'dark';
+  const COPY_ONLY_KEY = 'copy_only_modifier'; // 구조: { enabled, shift, alt, ctrl, meta, code, key }
+  // 기본값: macOS 면 Cmd, 그 외엔 Shift 가 직관적
+  const IS_MAC = /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+  const DEFAULT_COPY_ONLY_BINDING = {
+    enabled: true,
+    shift: !IS_MAC, alt: false, ctrl: false, meta: IS_MAC,
+    code: '', key: ''
+  };
   const SCHEMA_VERSION = 1;
 
   // ----- DOM 핸들 -----
@@ -75,6 +83,11 @@
   const confirmMsg   = $('confirmMessage');
   const okConfirmBtn = $('okConfirmBtn');
   const cancelConfirmBtn = $('cancelConfirmBtn');
+  const copyOnlyModal     = $('copyOnlyModal');
+  const copyOnlyKeyBox    = $('copyOnlyKeyBox');
+  const closeCopyOnlyBtn  = $('closeCopyOnlyBtn');
+  const cancelCopyOnlyBtn = $('cancelCopyOnlyBtn');
+  const saveCopyOnlyBtn   = $('saveCopyOnlyBtn');
 
   // ----- 상태 -----
   let entries = [];
@@ -87,6 +100,8 @@
   let gauthCurrentPage = 0;
   let viewMode = 'tile';   // 'tile' | 'detail'
   let theme = DEFAULT_THEME;
+  let copyOnlyBinding = { ...DEFAULT_COPY_ONLY_BINDING };
+  const heldKeys = new Set(); // 현재 popup 컨텍스트에서 눌려 있는 키 코드 — 비-수정 키 바인딩 판정용
   let dragSourceId = null; // 드래그 중인 entry id
   let renameTargetId = null;
   let tileMenuTargetId = null;
@@ -135,6 +150,187 @@
     theme = name;
     await storageSet(THEME_KEY, theme);
     applyTheme();
+  }
+
+  // ----- 복사 전용 키 바인딩 -----
+  // copyOnlyBinding 구조: { enabled, shift, alt, ctrl, meta, code, key }
+  // - 수정 키만 바인딩(예: Shift): code='' — 이벤트의 *Key 플래그로 판정
+  // - 일반 키 바인딩(예: 'KeyC'): heldKeys 로 현재 눌림 여부 판정
+  async function loadCopyOnlyBinding() {
+    const v = await storageGet(COPY_ONLY_KEY);
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      copyOnlyBinding = {
+        enabled: !!v.enabled,
+        shift: !!v.shift, alt: !!v.alt, ctrl: !!v.ctrl, meta: !!v.meta,
+        code: typeof v.code === 'string' ? v.code : '',
+        key: typeof v.key === 'string' ? v.key : ''
+      };
+    } else if (typeof v === 'string') {
+      // 이전 버전 문자열 값 마이그레이션
+      const base = { enabled: true, shift: false, alt: false, ctrl: false, meta: false, code: '', key: '' };
+      if (v === 'none')       copyOnlyBinding = { ...base, enabled: false };
+      else if (v === 'shift') copyOnlyBinding = { ...base, shift: true };
+      else if (v === 'alt')   copyOnlyBinding = { ...base, alt: true };
+      else if (v === 'ctrl')  copyOnlyBinding = IS_MAC ? { ...base, meta: true } : { ...base, ctrl: true };
+      else copyOnlyBinding = { ...DEFAULT_COPY_ONLY_BINDING };
+    } else {
+      copyOnlyBinding = { ...DEFAULT_COPY_ONLY_BINDING };
+    }
+  }
+
+  function applyCopyOnlyBinding() {
+    const disableBtn = document.querySelector('[data-action="copyonly-disable"]');
+    const configBtn  = document.querySelector('[data-action="copyonly-config"]');
+    const textEl     = document.querySelector('.copyonly-current-text');
+    if (disableBtn) disableBtn.classList.toggle('active', !copyOnlyBinding.enabled);
+    if (configBtn)  configBtn.classList.toggle('active',  copyOnlyBinding.enabled);
+    if (textEl) {
+      const label = formatBinding(copyOnlyBinding);
+      textEl.textContent = copyOnlyBinding.enabled ? `현재 키: ${label}` : '키 설정...';
+    }
+  }
+
+  function bindingIsEmpty(b) {
+    return !b.shift && !b.alt && !b.ctrl && !b.meta && !b.code;
+  }
+
+  function isCopyOnlyClick(event) {
+    if (!event) return false;
+    const b = copyOnlyBinding;
+    if (!b.enabled || bindingIsEmpty(b)) return false;
+    if (!!b.shift !== !!event.shiftKey) return false;
+    if (!!b.alt   !== !!event.altKey)   return false;
+    if (!!b.ctrl  !== !!event.ctrlKey)  return false;
+    if (!!b.meta  !== !!event.metaKey)  return false;
+    if (b.code) return heldKeys.has(b.code);
+    return true;
+  }
+
+  function formatBinding(b) {
+    if (!b) return '없음';
+    const parts = [];
+    if (b.ctrl) parts.push('Ctrl');
+    if (b.meta) parts.push(IS_MAC ? 'Cmd' : 'Meta');
+    if (b.alt)  parts.push(IS_MAC ? 'Option' : 'Alt');
+    if (b.shift) parts.push('Shift');
+    if (b.code) parts.push(prettyKey(b.code, b.key));
+    return parts.length ? parts.join(' + ') : '없음';
+  }
+
+  function prettyKey(code, key) {
+    if (!code) return key || '';
+    if (code.startsWith('Key')) return code.slice(3);
+    if (code.startsWith('Digit')) return code.slice(5);
+    if (code.startsWith('Numpad')) return 'Num' + code.slice(6);
+    if (code.startsWith('Arrow')) return code.slice(5);
+    if (/^F\d+$/.test(code)) return code;
+    const map = {
+      Space: 'Space', Enter: 'Enter', Tab: 'Tab', Escape: 'Esc',
+      Backspace: 'Backspace', Delete: 'Del', Insert: 'Insert',
+      Home: 'Home', End: 'End', PageUp: 'PgUp', PageDown: 'PgDn',
+      Backquote: '`', Minus: '-', Equal: '=',
+      BracketLeft: '[', BracketRight: ']',
+      Semicolon: ';', Quote: "'", Backslash: '\\',
+      Comma: ',', Period: '.', Slash: '/'
+    };
+    return map[code] || key || code;
+  }
+
+  async function persistCopyOnlyBinding() {
+    await storageSet(COPY_ONLY_KEY, copyOnlyBinding);
+    applyCopyOnlyBinding();
+  }
+
+  // ----- 키 설정 모달 -----
+  // 사용자가 누른 키를 캡처해 candidate 에 보관. 저장 시 copyOnlyBinding 으로 확정.
+  let copyOnlyCaptureHandlers = null; // 등록된 keydown/keyup 핸들러 (cleanup 용)
+  let copyOnlyCandidate = null;       // 현재 미저장 캡처 상태
+
+  function openCopyOnlyModal() {
+    copyOnlyCandidate = null;
+    copyOnlyKeyBox.textContent = '키를 누르세요...';
+    copyOnlyKeyBox.classList.add('waiting');
+    saveCopyOnlyBtn.disabled = true;
+    copyOnlyModal.classList.remove('hidden');
+    attachCaptureListeners();
+  }
+
+  function closeCopyOnlyModal() {
+    detachCaptureListeners();
+    copyOnlyModal.classList.add('hidden');
+    copyOnlyCandidate = null;
+    copyOnlyKeyBox.classList.remove('waiting');
+    heldKeys.clear(); // 모달 안에서 preventDefault 한 keyup 이 누락되었을 수 있어 안전하게 초기화
+  }
+
+  function attachCaptureListeners() {
+    if (copyOnlyCaptureHandlers) return;
+    const onKeyDown = (e) => {
+      // ESC 단독은 모달 취소
+      if (e.key === 'Escape' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeCopyOnlyModal();
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isModKey = (e.key === 'Shift' || e.key === 'Alt' || e.key === 'Control' || e.key === 'Meta');
+      copyOnlyCandidate = {
+        enabled: true,
+        shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey, meta: e.metaKey,
+        code: isModKey ? '' : e.code,
+        key:  isModKey ? '' : e.key
+      };
+      updateKeyBox();
+      if (!isModKey) {
+        // 비-수정 키가 눌렸으면 조합 확정 — 저장 버튼 활성화
+        saveCopyOnlyBtn.disabled = false;
+      }
+    };
+
+    const onKeyUp = (e) => {
+      if (!copyOnlyCandidate) return;
+      if (copyOnlyCandidate.code) {
+        // 비-수정 키 바인딩은 이미 확정 — 상태 유지
+        return;
+      }
+      // 수정 키만 바인딩: 모든 수정 키가 떨어진 순간 확정
+      if (!e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        if (!bindingIsEmpty(copyOnlyCandidate)) {
+          saveCopyOnlyBtn.disabled = false;
+        }
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('keyup',   onKeyUp,   true);
+    copyOnlyCaptureHandlers = { onKeyDown, onKeyUp };
+  }
+
+  function detachCaptureListeners() {
+    if (!copyOnlyCaptureHandlers) return;
+    document.removeEventListener('keydown', copyOnlyCaptureHandlers.onKeyDown, true);
+    document.removeEventListener('keyup',   copyOnlyCaptureHandlers.onKeyUp,   true);
+    copyOnlyCaptureHandlers = null;
+  }
+
+  function updateKeyBox() {
+    if (!copyOnlyCandidate || bindingIsEmpty(copyOnlyCandidate)) {
+      copyOnlyKeyBox.textContent = '키를 누르세요...';
+      copyOnlyKeyBox.classList.add('waiting');
+    } else {
+      copyOnlyKeyBox.textContent = formatBinding(copyOnlyCandidate);
+      copyOnlyKeyBox.classList.remove('waiting');
+    }
+  }
+
+  async function saveCopyOnlyFromModal() {
+    if (!copyOnlyCandidate || bindingIsEmpty(copyOnlyCandidate)) return;
+    copyOnlyBinding = copyOnlyCandidate;
+    await persistCopyOnlyBinding();
+    closeCopyOnlyModal();
   }
 
   // ----- 유틸 -----
@@ -425,7 +621,7 @@
   }
 
   // ----- 클립보드 복사 + 자동 채우기 -----
-  async function copyAndFill(entry) {
+  async function copyAndFill(entry, event) {
     let code;
     try {
       code = await BoxOTP.generateTOTP(entry.secret, {
@@ -448,19 +644,25 @@
     }
 
     // 2) 자동 채우기 시도 (활성 탭)
+    // 수정 키 + 클릭으로 진입했다면 자동 채우기를 건너뛰어 복사만 수행 — 분할 입력 호환성 이슈 회피용.
+    const copyOnly = isCopyOnlyClick(event);
     let filled = false;
-    try {
-      filled = await tryAutofill(code);
-    } catch (e) {
-      console.warn('autofill 실패', e);
+    if (!copyOnly) {
+      try {
+        filled = await tryAutofill(code);
+      } catch (e) {
+        console.warn('autofill 실패', e);
+      }
     }
 
     const name = entry.issuer ? `${entry.issuer} · ${entry.label}` : entry.label;
     let msg = '';
-    if (filled && copied) msg = `${name} 채움 + 복사됨`;
-    else if (filled)      msg = `${name} 채움`;
-    else if (copied)      msg = `${name} 복사됨`;
-    else                  msg = `${name} 실패`;
+    if (copyOnly && copied)    msg = `${name} 복사됨 (채움 건너뜀)`;
+    else if (copyOnly)         msg = `${name} 실패`;
+    else if (filled && copied) msg = `${name} 채움 + 복사됨`;
+    else if (filled)           msg = `${name} 채움`;
+    else if (copied)           msg = `${name} 복사됨`;
+    else                       msg = `${name} 실패`;
     showToast(msg, (filled || copied) ? 'success' : 'error');
   }
 
@@ -1307,9 +1509,10 @@
     menuDropdown.querySelectorAll('.dropdown-item').forEach((item) => {
       item.addEventListener('click', () => {
         const act = item.dataset.action;
-        // 테마 변경은 메뉴를 닫지 않아 사용자가 여러 테마를 비교해볼 수 있음
+        // 테마 변경 / 사용 안 함 토글은 메뉴를 닫지 않음. 키 설정은 모달을 열어야 하므로 메뉴를 닫음.
         const isTheme = act && act.startsWith('theme-');
-        if (!isTheme) toggleMenu(false);
+        const keepMenuOpen = isTheme || act === 'copyonly-disable';
+        if (!keepMenuOpen) toggleMenu(false);
         if (act === 'export-plain') exportPlain();
         if (act === 'export-encrypted') exportEncrypted();
         if (act === 'export-gauth') exportGoogleAuth();
@@ -1317,8 +1520,23 @@
         if (act === 'import-txt') importTxtFile.click();
         if (act === 'delete-all') confirmDeleteAll();
         if (isTheme) setTheme(act.slice('theme-'.length));
+        if (act === 'copyonly-disable') {
+          copyOnlyBinding = { ...copyOnlyBinding, enabled: false };
+          persistCopyOnlyBinding();
+        }
+        if (act === 'copyonly-config') openCopyOnlyModal();
       });
     });
+
+    // 키 설정 모달 버튼
+    closeCopyOnlyBtn.addEventListener('click', closeCopyOnlyModal);
+    cancelCopyOnlyBtn.addEventListener('click', closeCopyOnlyModal);
+    saveCopyOnlyBtn.addEventListener('click', saveCopyOnlyFromModal);
+
+    // 비-수정 키 바인딩 판정용 held-key 추적 (모달 캡처 핸들러보다 일반 phase 라서 캡처 모드 중에는 호출되지 않음)
+    document.addEventListener('keydown', (e) => { heldKeys.add(e.code); });
+    document.addEventListener('keyup',   (e) => { heldKeys.delete(e.code); });
+    window.addEventListener('blur', () => { heldKeys.clear(); });
 
     // 복원 파일
     importFile.addEventListener('change', (e) => {
@@ -1507,8 +1725,10 @@
     applyTheme();           // FOUC 최소화를 위해 DOM/이벤트 바인딩 전에 한 번 적용
     await loadEntries();
     await loadViewMode();
+    await loadCopyOnlyBinding();
     bindEvents();
     applyTheme();           // 메뉴 .theme-item의 active 클래스 갱신을 위해 한 번 더
+    applyCopyOnlyBinding();  // 메뉴 .copyonly-item active + 현재 키 텍스트 갱신
     render();
     startTimerLoop();
     await checkPendingCapture();

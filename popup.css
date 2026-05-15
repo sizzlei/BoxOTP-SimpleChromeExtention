@@ -247,16 +247,53 @@ body {
   flex-shrink: 0;
 }
 
-.theme-item.active {
+.theme-item.active,
+.copyonly-item.active {
   color: var(--accent);
   background: var(--accent-soft);
 }
 
-.theme-item.active::after {
+.theme-item.active::after,
+.copyonly-item.active::after {
   content: '✓';
   margin-left: auto;
   color: var(--accent);
   font-weight: 600;
+}
+
+/* 복사만 수행 키 설정 모달 */
+.copyonly-hint {
+  margin: 4px 0 12px;
+  color: var(--text-muted, var(--text));
+  opacity: 0.85;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.copyonly-sub {
+  margin: 10px 0 0;
+  color: var(--text);
+  opacity: 0.6;
+  font-size: 12px;
+  text-align: center;
+}
+.copyonly-keybox {
+  margin: 4px 0 0;
+  padding: 18px 12px;
+  border: 1px dashed var(--border-hi);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.3px;
+  min-height: 24px;
+}
+.copyonly-keybox.waiting {
+  color: var(--text);
+  opacity: 0.55;
+  font-weight: 500;
+  background: transparent;
 }
 
 /* ----- OTP List ----- */

@@ -46,6 +46,10 @@
       <span class="theme-swatch" style="background: linear-gradient(135deg, #0d0b1e 50%, #a78bfa 50%);"></span>미드나잇
     </button>
     <div class="dropdown-divider"></div>
+    <div class="dropdown-label">⌨️ 복사만 수행 (수정 키 + 클릭)</div>
+    <button class="dropdown-item copyonly-item" data-action="copyonly-disable">사용 안 함</button>
+    <button class="dropdown-item copyonly-item" data-action="copyonly-config"><span class="copyonly-current-text">키 설정...</span></button>
+    <div class="dropdown-divider"></div>
     <button class="dropdown-item danger" data-action="delete-all">🗑️ 전체 삭제</button>
   </div>
 
@@ -210,6 +214,23 @@
       <div class="modal-footer">
         <button id="cancelConfirmBtn" class="btn btn-ghost">취소</button>
         <button id="okConfirmBtn" class="btn btn-danger">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 복사만 수행 키 설정 모달 -->
+  <div id="copyOnlyModal" class="modal hidden">
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2>복사만 수행 키 설정</h2>
+        <button id="closeCopyOnlyBtn" class="icon-btn">✕</button>
+      </div>
+      <p class="copyonly-hint">OTP 클릭 시 자동 채우기를 건너뛰고 복사만 수행할 키 / 조합을 누르세요.</p>
+      <div id="copyOnlyKeyBox" class="copyonly-keybox">키를 누르세요...</div>
+      <p class="copyonly-sub">비-수정 키는 즉시 인식, 수정 키만이면 손을 떼는 순간 인식 · ESC 로 취소</p>
+      <div class="modal-footer">
+        <button id="cancelCopyOnlyBtn" class="btn btn-ghost">취소</button>
+        <button id="saveCopyOnlyBtn" class="btn btn-primary" disabled>저장</button>
       </div>
     </div>
   </div>
